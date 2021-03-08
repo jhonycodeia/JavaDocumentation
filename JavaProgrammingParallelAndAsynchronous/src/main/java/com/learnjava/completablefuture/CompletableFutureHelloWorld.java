@@ -2,9 +2,12 @@ package com.learnjava.completablefuture;
 
 import com.learnjava.service.HelloWorldService;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 import static com.learnjava.util.CommonUtil.*;
 import static com.learnjava.util.LoggerUtil.log;
@@ -96,6 +99,35 @@ public class CompletableFutureHelloWorld {
         return hw;
     }
 
+    public String helloworld_3_async_calls_log_async(){
+        startTimer();
+
+        CompletableFuture<String> hello = CompletableFuture.supplyAsync(()->hws.hello());
+        CompletableFuture<String> world = CompletableFuture.supplyAsync(()->hws.world());
+        CompletableFuture<String> hiCompletableFuture =  CompletableFuture.supplyAsync(()->{
+            delay(1000);
+            return " Hi CompletableFuture!";
+        });
+
+        String hw= hello
+                .thenCombineAsync(world, (h, w) -> {
+                    log("thenCombine h/w");
+                    return h+w;
+                }) // first, second
+                .thenCombineAsync(hiCompletableFuture, (previous,current)->{
+                    log("thenCombine previous/current");
+                    return previous+current;
+                })
+                .thenApplyAsync(s -> {
+                    log("thenApply");
+                    return  s.toUpperCase();
+                })
+                .join();
+
+        timeTaken();
+        return hw;
+    }
+
     public String helloworld_3_async_calls_custom_threadpool(){
         startTimer();
 
@@ -126,6 +158,36 @@ public class CompletableFutureHelloWorld {
         return hw;
     }
 
+    public String helloworld_3_async_calls_custom_threadpool_async(){
+        startTimer();
+
+        ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        CompletableFuture<String> hello = CompletableFuture.supplyAsync(()->hws.hello(),executorService);
+        CompletableFuture<String> world = CompletableFuture.supplyAsync(()->hws.world(),executorService);
+        CompletableFuture<String> hiCompletableFuture =  CompletableFuture.supplyAsync(()->{
+            delay(1000);
+            return " Hi CompletableFuture!";
+        },executorService);
+
+        String hw= hello
+                .thenCombineAsync(world, (h, w) -> {
+                    log("thenCombine h/w");
+                    return h+w;
+                }, executorService)  // first, second
+                .thenCombineAsync(hiCompletableFuture, (previous,current)->{
+                    log("thenCombine previous/current");
+                    return previous+current;
+                },executorService)
+                .thenApplyAsync(s -> {
+                    log("thenApply");
+                    return  s.toUpperCase();
+                },executorService)
+                .join();
+
+        timeTaken();
+        return hw;
+    }
+
     public CompletableFuture<String> helloWorld_thenCompose(){
 
         return CompletableFuture.supplyAsync(hws::hello)
@@ -133,6 +195,85 @@ public class CompletableFutureHelloWorld {
                 .thenApply(String::toUpperCase)
                 /*.join()*/;
     }
+
+    public String anyOf() {
+
+        //db
+        CompletableFuture<String> db = CompletableFuture.supplyAsync(() -> {
+            delay(4000);
+            log("response from db");
+            return "hello world";
+        });
+
+        //restCall
+        CompletableFuture<String> restCall = CompletableFuture.supplyAsync(() -> {
+            delay(2000);
+            log("response from restCall");
+            return "hello world";
+        });
+
+        //soapCall
+        CompletableFuture<String> soapCall = CompletableFuture.supplyAsync(() -> {
+            delay(3000);
+            log("response from soapCall");
+            return "hello world";
+        });
+
+        List<CompletableFuture<String>> cfList = List.of(db, restCall, soapCall);
+
+        CompletableFuture<Object> cfAnyOf = CompletableFuture.anyOf(cfList.toArray(new CompletableFuture[cfList.size()]));
+
+        String result = (String) cfAnyOf.thenApply(v -> {
+
+            if (v instanceof String) {
+                return v;
+            }
+            return null;
+
+        })
+                .join();
+
+        return result;
+
+    }
+
+    public String allOf() {
+
+        //db
+        CompletableFuture<String> db = CompletableFuture.supplyAsync(() -> {
+            delay(4000);
+            log("response from db");
+            return "hello world";
+        });
+
+        //restCall
+        CompletableFuture<String> restCall = CompletableFuture.supplyAsync(() -> {
+            delay(2000);
+            log("response from restCall");
+            return "hello world";
+        });
+
+        //soapCall
+        CompletableFuture<String> soapCall = CompletableFuture.supplyAsync(() -> {
+            delay(3000);
+            log("response from soapCall");
+            return "hello world";
+        });
+
+        List<CompletableFuture<String>> cfList = List.of(db, restCall, soapCall);
+
+        CompletableFuture<Void> cfAnyOf = CompletableFuture.allOf(cfList.toArray(new CompletableFuture[cfList.size()]));
+
+        String result = (String) cfAnyOf.thenApply(v->{
+            return cfList.stream().map(CompletableFuture::join)
+                    .collect(Collectors.joining());
+        }).join();
+
+        return result;
+
+    }
+
+
 
     public static void main(String[] args) {
 
